@@ -1,4 +1,4 @@
-$drupal_version = '7.14'
+$drupal_version = '7.21'
 
 Exec {
     path => '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
@@ -6,11 +6,6 @@ Exec {
 class setup {
     exec { 'update':
         command => 'sudo apt-get update'
-    }
-
-    exec { 'upgrade':
-        command => 'sudo -E apt-get upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"',
-        environment => "DEBIAN_FRONTEND=noninteractive"
     }
 }
 
@@ -24,7 +19,7 @@ class { 'apt':
 
 #Install default applications
 case $::operatingsystem {
-  default: { $default_packages = ['tree','zip','unzip','subversion','wget','ant','ant-contrib','python-setuptools', 'phpmyadmin'] }
+  default: { $default_packages = ['tree','zip','unzip','subversion','wget','ant','ant-contrib','python-setuptools'] }
 }
 
 package { $default_packages:
@@ -54,49 +49,39 @@ package { $project_packages:
   require  => Exec['update'],
 }
 
-class { 'apache': 
-  user => 'vagrant',
-  group => 'vagrant',
-}
 class { 'apache::php': }
 
 class { 'mysql': }
 class { 'mysql::server':
-  config_hash => { 'root_password' => 'vagrant' }
+  config_hash => { 'root_password' => 'vagrant' },
+  require  => Exec['update'],
 }
 
-#file { '/vagrant/drupal-data':
-#  ensure => directory,
-#  owner  => 'www-data',
-#  group  => 'www-data',
-#  mode   => '0777',
-#}
+exec { 'download-drupal':
+  command => "wget http://ftp.drupal.org/files/projects/drupal-$drupal_version.zip -O /vagrant/drupal-$drupal_version.zip",
+  creates => "/vagrant/drupal-$drupal_version.zip",
+  require => Package[$default_packages],
+}
 
-#exec { 'download-drupal':
-#  command => "wget http://ftp.drupal.org/files/projects/drupal-$drupal_version.zip -O /vagrant/drupal-$drupal_version.zip",
-#  creates => "/vagrant/drupal-$drupal_version.zip",
-#  require => Package[$default_packages],
-#}
-
-#exec { 'unzip-drupal-zip':
-#  command => "unzip /vagrant/drupal-$drupal_version.zip  -d /home/vagrant",
-#  creates => "/vagrant/drupal-$drupal_version",
-#  require => Exec['download-drupal'],
-#}
+exec { 'unzip-drupal-zip':
+  command => "unzip /vagrant/drupal-$drupal_version.zip  -d /vagrant/drupal-$drupal_version",
+  creates => "/vagrant/drupal-$drupal_version",
+  require => Exec['download-drupal'],
+}
 
 file { "/vagrant/drupal-$drupal_version":
   ensure  => directory,
-  owner   => 'www-data',
-  group   => 'www-data',
+  owner   => 'vagrant',
+  group   => 'vagrant',
   recurse => true,
-  mode    => '0777',
-#  require => Exec['unzip-drupal-zip'],
+  mode    => '644',
+  require => Exec['unzip-drupal-zip'],
 }
 
 file { '/home/vagrant/drupal-www':
   ensure  => link,
   target  => "/vagrant/drupal-$drupal_version",
-#  require => File["/vagrant/drupal-$drupal_version"],
+  require => File["/vagrant/drupal-$drupal_version"],
 }
 
 apache::vhost { 'drupal.test':
@@ -104,7 +89,7 @@ apache::vhost { 'drupal.test':
   port               => '80',
   docroot            => '/home/vagrant/drupal-www',
   configure_firewall => false,
-#  require            => [Exec['unzip-drupal-zip'],File['/vagrant/drupal-data']],
+  require            => [File['/home/vagrant/drupal-www']],
 }
 ufw::allow { 'allow-http-from-all':
   port => 80,
@@ -115,5 +100,5 @@ mysql::db { 'drupal':
   password => 'drupal',
   host     => 'localhost',
   grant    => ['all'],
-  require  => Class['mysql::server'],
+  require  => [Exec['update'], Class['mysql::server']],
 }

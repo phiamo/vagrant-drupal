@@ -19,8 +19,8 @@
 #
 class apache::params {
 
-  $user          = 'www-data'
-  $group         = 'www-data'
+  $user          = 'vagrant'
+  $group         = 'vagrant'
   $ssl           = true
   $template      = 'apache/vhost-default.conf.erb'
   $priority      = '25'
