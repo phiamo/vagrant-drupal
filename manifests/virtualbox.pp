@@ -64,7 +64,7 @@ exec { 'download-drupal':
 }
 
 exec { 'unzip-drupal-zip':
-  command => "unzip /vagrant/drupal-$drupal_version.zip  -d /vagrant/drupal-$drupal_version",
+  command => "unzip /vagrant/drupal-$drupal_version.zip  -d /vagrant/",
   creates => "/vagrant/drupal-$drupal_version",
   require => Exec['download-drupal'],
 }
